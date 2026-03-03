@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* ── Video Anti-Piracy Protection ── */
+
+/* Hide video content when printing / print-screen */
+@media print {
+    .video-protection-container,
+    video,
+    .react-player {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    body::before {
+        content: "Video content is protected and cannot be printed.";
+        display: block;
+        padding: 2rem;
+        font-size: 1.25rem;
+        text-align: center;
+        color: #ef4444;
+    }
+}
+
+/* Prevent text/element selection on video areas */
+.video-protection-container {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+/* Disable drag on video and related elements */
+.video-protection-container video,
+.video-protection-container img,
+.video-protection-container canvas {
+    -webkit-user-drag: none !important;
+    -khtml-user-drag: none !important;
+    -moz-user-drag: none !important;
+    -o-user-drag: none !important;
+    user-drag: none !important;
+    pointer-events: none !important;
+}
+
+/* Re-enable pointer events on the controls layer */
+.video-protection-container .video-controls {
+    pointer-events: auto !important;
+}
