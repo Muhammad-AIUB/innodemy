@@ -16,11 +16,20 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+
           script: |
             cd /var/www/innodemy
             git pull origin main
+
+            echo "Deploying Backend..."
 
             cd innodemy-backend
             pnpm install
             pnpm prisma migrate deploy
             pm2 restart innodemy-backend
+
+            echo "Deploying Frontend..."
+
+            cd ../innodemy-frontend-vite
+            npm install
+            npm run build
