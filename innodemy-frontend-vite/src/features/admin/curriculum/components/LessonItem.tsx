@@ -8,6 +8,7 @@ const typeIcons: Record<Lesson["type"], string> = {
     VIDEO: "🎬",
     QUIZ: "📝",
     ASSIGNMENT: "📋",
+    ARTICLE: "📄",
 };
 
 interface LessonItemProps {

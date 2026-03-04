@@ -56,7 +56,7 @@ const EditCoursePage = () => {
                 description: course.description,
                 bannerImage: course.bannerImage,
                 price: course.price,
-                discountPrice: course.discountPrice,
+                discountPrice: course.discountPrice ?? undefined,
                 duration: course.duration,
                 startDate: course.startDate
                     ? new Date(course.startDate).toISOString().slice(0, 16)

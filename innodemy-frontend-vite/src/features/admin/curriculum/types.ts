@@ -14,7 +14,7 @@
  *   PATCH /api/v1/lessons/:id/reorder      { direction }
  */
 
-export type LessonType = "VIDEO" | "QUIZ" | "ASSIGNMENT";
+export type LessonType = "VIDEO" | "QUIZ" | "ASSIGNMENT" | "ARTICLE";
 
 export type ReorderDirection = "up" | "down";
 
