@@ -2,8 +2,12 @@ import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 import { normalizeApiError } from "./error";
 
+// Append /api/v1 to VITE_API_URL (e.g. http://localhost:5000 -> http://localhost:5000/api/v1)
+const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "").replace(/\/api\/v1\/?$/, "");
+const baseURL = `${baseUrl}/api/v1`;
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL,
     withCredentials: true,
     headers: {
         "Content-Type": "application/json",

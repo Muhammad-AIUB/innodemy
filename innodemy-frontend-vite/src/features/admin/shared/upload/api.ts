@@ -1,7 +1,11 @@
 import axios from "axios";
 
+// Append /api/v1 to VITE_API_URL to match backend global prefix
+const baseUrl = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "").replace(/\/api\/v1\/?$/, "");
+const baseURL = `${baseUrl}/api/v1`;
+
 const uploadApi = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
+    baseURL,
     withCredentials: true,
 });
 
