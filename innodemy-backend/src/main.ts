@@ -25,7 +25,8 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // ─── MULTIPART SUPPORT (FILE UPLOADS) ─────────────────────────────────────
-  await app.register(multipart, {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Fastify plugin type augmentation
+  await app.register(multipart as any, {
     limits: {
       fileSize: 100 * 1024 * 1024, // 100MB max
       files: 1, // Only 1 file per request
@@ -33,7 +34,8 @@ async function bootstrap() {
   });
 
   // ─── STATIC FILE SERVING ──────────────────────────────────────────────────
-  await app.register(fastifyStatic, {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Fastify plugin type augmentation
+  await app.register(fastifyStatic as any, {
     root: join(process.cwd(), 'public'),
     prefix: '/',
   });
@@ -48,7 +50,8 @@ async function bootstrap() {
   );
 
   // ─── HELMET SECURITY HEADERS ──────────────────────────────────────────────
-  await app.register(helmet, {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Fastify plugin type augmentation
+  await app.register(helmet as any, {
     contentSecurityPolicy:
       process.env.NODE_ENV === 'production'
         ? {
@@ -75,10 +78,14 @@ async function bootstrap() {
 
   // ─── RATE LIMITING ────────────────────────────────────────────────────────
   // Global: 100 req/min. Route-specific overrides via routeConfig.
-  await app.register(rateLimit, {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Fastify plugin type augmentation
+  await app.register(rateLimit as any, {
     max: 100,
     timeWindow: '1 minute',
-    keyGenerator: (req) => (req.headers['x-forwarded-for'] as string) || req.ip,
+    keyGenerator: (req: {
+      headers: Record<string, string | undefined>;
+      ip: string;
+    }) => (req.headers['x-forwarded-for'] as string) || req.ip,
     addHeadersOnExceeding: {
       'x-ratelimit-limit': true,
       'x-ratelimit-remaining': true,
@@ -91,9 +98,10 @@ async function bootstrap() {
   });
 
   // ─── STRICT CORS ──────────────────────────────────────────────────────────
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
+  const envOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-    : ['http://localhost:3000'];
+    : ['http://localhost:5173'];
+  const allowedOrigins = [...new Set([...envOrigins, 'http://localhost:5173'])];
 
   console.log('🔐 CORS Configuration:');
   console.log('   Allowed Origins:', allowedOrigins);
