@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   UnauthorizedException,
@@ -21,6 +22,8 @@ import { MailService } from '../../../shared/mail/mail.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly jwtService: JwtService,
@@ -94,7 +97,15 @@ export class AuthService {
 
     await this.authRepository.createOtp(email, code, expiresAt);
 
-    await this.mailService.sendOtpEmail(email, code);
+    // Fire-and-forget: send email in background so API returns immediately.
+    // MailService logs errors; .catch() prevents unhandled rejection if it rethrows.
+    this.mailService
+      .sendOtpEmail(email, code)
+      .catch((err) =>
+        this.logger.warn(
+          `Background OTP email failed for ${email}: ${(err as Error).message}`,
+        ),
+      );
 
     return { message: 'OTP sent successfully. Check your email.' };
   }
