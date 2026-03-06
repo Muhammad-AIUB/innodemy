@@ -20,6 +20,22 @@ import { GoogleLoginDto } from '../dto/google-login.dto';
 import { CreateAdminDto } from '../dto/create-admin.dto';
 import { MailService } from '../../../shared/mail/mail.service';
 
+/** Fields needed for login auth checks, JWT, and sanitized response. */
+type LoginUser = Pick<
+  User,
+  | 'id'
+  | 'name'
+  | 'email'
+  | 'password'
+  | 'phoneNumber'
+  | 'role'
+  | 'provider'
+  | 'isVerified'
+  | 'isActive'
+  | 'isDeleted'
+  | 'createdAt'
+>;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -48,7 +64,22 @@ export class AuthService {
     return this.jwtService.sign(payload);
   }
 
-  private sanitizeUser(user: User) {
+  /** Minimal user shape for login response; also accepts full User. */
+  private sanitizeUser(
+    user: Pick<
+      User,
+      | 'id'
+      | 'name'
+      | 'email'
+      | 'phoneNumber'
+      | 'role'
+      | 'provider'
+      | 'isVerified'
+      | 'isActive'
+      | 'isDeleted'
+      | 'createdAt'
+    >,
+  ) {
     return {
       id: user.id,
       name: user.name,
@@ -161,7 +192,11 @@ export class AuthService {
   async login(dto: LoginDto): Promise<{ accessToken: string; user: object }> {
     const { email, password } = dto;
 
-    const user = await this.authRepository.findUserByEmail(email);
+    // Repository returns UserForLogin | null; typed as LoginUser for lint resolution
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- findUserByEmailForLogin is correctly typed in AuthRepository
+    const user = (await this.authRepository.findUserByEmailForLogin(
+      email,
+    )) as LoginUser | null;
     if (!user) {
       throw new UnauthorizedException('Invalid email or password.');
     }

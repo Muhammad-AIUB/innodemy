@@ -2,6 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { OtpCode, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
+/** User fields needed for login: auth checks, JWT, and response payload. */
+export type UserForLogin = Pick<
+  User,
+  | 'id'
+  | 'name'
+  | 'email'
+  | 'password'
+  | 'phoneNumber'
+  | 'role'
+  | 'provider'
+  | 'isVerified'
+  | 'isActive'
+  | 'isDeleted'
+  | 'createdAt'
+>;
+
 @Injectable()
 export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -10,6 +26,26 @@ export class AuthRepository {
 
   async findUserByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });
+  }
+
+  /** Fetches only fields required for login: auth checks + JWT + response payload. */
+  async findUserByEmailForLogin(email: string): Promise<UserForLogin | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        password: true,
+        phoneNumber: true,
+        role: true,
+        provider: true,
+        isVerified: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+      },
+    });
   }
 
   async findUserByGoogleId(googleId: string): Promise<User | null> {
