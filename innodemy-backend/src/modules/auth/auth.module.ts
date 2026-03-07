@@ -19,7 +19,8 @@ import { OtpBruteforceGuard } from '../../common/guards/otp-bruteforce.guard';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: '1d',
+          // Default for access tokens; overridden per-call in AuthService
+          expiresIn: '15m',
         },
       }),
     }),

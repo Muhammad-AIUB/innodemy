@@ -106,6 +106,7 @@ model User {
   reviewedPayments     Payment[]            @relation("PaymentReviewer")
   adminActions         AdminActionLog[]
   enrollmentRequests   EnrollmentRequest[]
+  refreshTokens        RefreshToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,6 +145,21 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  jti       String   @unique
+  userId    String
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([jti])
+  @@index([userId])
   @@index([expiresAt])
 }
 

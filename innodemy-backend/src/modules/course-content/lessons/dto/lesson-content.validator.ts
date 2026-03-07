@@ -12,7 +12,7 @@ const LESSON_CONTENT_TYPES = ['text', 'video', 'resource'] as const;
 type LessonContentType = (typeof LESSON_CONTENT_TYPES)[number];
 
 const hasOwn = (obj: object, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(obj, key);
+  Object.prototype.hasOwnProperty.call(obj, key) as boolean;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -87,6 +87,7 @@ class LessonContentBlocksValidator implements ValidatorConstraintInterface {
     return value.every((block) => isLessonContentBlock(block));
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Required by ValidatorConstraintInterface
   defaultMessage(_args?: ValidationArguments): string {
     return 'content must be an array of valid lesson blocks (text, video, resource).';
   }

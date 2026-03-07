@@ -91,7 +91,8 @@ async function bootstrap() {
       const forwarded = req.headers['x-forwarded-for'];
       if (forwarded) {
         const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-        const clientIp = typeof raw === 'string' ? raw.split(',')[0]?.trim() : undefined;
+        const clientIp =
+          typeof raw === 'string' ? raw.split(',')[0]?.trim() : undefined;
         return clientIp ?? req.ip;
       }
       return req.ip;

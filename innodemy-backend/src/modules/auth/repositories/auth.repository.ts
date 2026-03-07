@@ -181,4 +181,32 @@ export class AuthRepository {
       data: { isUsed: true },
     });
   }
+
+  // ─── REFRESH TOKEN QUERIES ────────────────────────────────────────────────
+
+  async createRefreshToken(
+    jti: string,
+    userId: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.prisma.refreshToken.create({
+      data: { jti, userId, expiresAt },
+    });
+  }
+
+  /**
+   * Finds and deletes a refresh token by jti if it exists and is not expired.
+   * Returns the userId if valid and consumed; null otherwise.
+   */
+  async findAndConsumeRefreshToken(jti: string): Promise<string | null> {
+    const now = new Date();
+    const token = await this.prisma.refreshToken.findUnique({
+      where: { jti },
+    });
+    if (!token || token.expiresAt <= now) {
+      return null;
+    }
+    await this.prisma.refreshToken.delete({ where: { jti } });
+    return token.userId;
+  }
 }

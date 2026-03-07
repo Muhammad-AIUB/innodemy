@@ -241,7 +241,7 @@ export class LessonsService {
     direction: 'up' | 'down',
     user: JwtPayload,
   ): Promise<void> {
-    const lesson = await this.validateLessonOwnership(lessonId, user);
+    await this.validateLessonOwnership(lessonId, user);
 
     await this.prisma.$transaction(async (tx) => {
       // Get the current lesson

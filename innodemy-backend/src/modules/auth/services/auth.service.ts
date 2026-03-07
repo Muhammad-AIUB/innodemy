@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -59,13 +60,35 @@ export class AuthService {
     return expiry;
   }
 
-  /**
-   * Signs a minimal JWT payload: sub (userId) + role only.
-   * Do not add personal/profile data — keeps token size small and reduces exposure.
-   */
-  private signToken(userId: string, role: UserRole): string {
+  /** Access token: short-lived (15m). Used for API auth via Bearer header. */
+  private signAccessToken(userId: string, role: UserRole): string {
     const payload = { sub: userId, role };
-    return this.jwtService.sign(payload);
+    return this.jwtService.sign(payload, { expiresIn: '15m' });
+  }
+
+  /** Refresh token: long-lived (7d). Stored in DB for rotation; exchanged for new access token. */
+  private signRefreshToken(userId: string, jti: string): string {
+    const payload = { sub: userId, jti, type: 'refresh' };
+    return this.jwtService.sign(payload, { expiresIn: '7d' });
+  }
+
+  /**
+   * Creates access + refresh token pair and persists the refresh token for rotation.
+   */
+  private async createTokenPair(
+    userId: string,
+    role: UserRole,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const jti = randomUUID();
+    const accessToken = this.signAccessToken(userId, role);
+    const refreshToken = this.signRefreshToken(userId, jti);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await this.authRepository.createRefreshToken(jti, userId, expiresAt);
+
+    return { accessToken, refreshToken };
   }
 
   /** Minimal user shape for login response; also accepts full User. */
@@ -151,10 +174,9 @@ export class AuthService {
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
     const { email, code } = dto;
 
-    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- AuthRepository returns Promise<OtpCode | null>; ESLint cannot resolve injected provider types */
     const otp: OtpCode | null =
       await this.authRepository.findLatestValidOtpByEmail(email);
-    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+
     if (!otp) {
       this.otpBruteforce.recordFailedAttempt(email);
       throw new BadRequestException('Invalid or expired OTP.');
@@ -176,7 +198,7 @@ export class AuthService {
 
   async register(
     dto: RegisterDto,
-  ): Promise<{ accessToken: string; user: object }> {
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const { name, email, password, phoneNumber } = dto;
 
     const existing = await this.authRepository.findUserByEmail(email);
@@ -196,14 +218,18 @@ export class AuthService {
       isVerified: true,
     });
 
-    const accessToken = this.signToken(user.id, user.role);
-
-    return { accessToken, user: this.sanitizeUser(user) };
+    const { accessToken, refreshToken } = await this.createTokenPair(
+      user.id,
+      user.role,
+    );
+    return { accessToken, refreshToken, user: this.sanitizeUser(user) };
   }
 
   // ─── LOGIN ────────────────────────────────────────────────────────────────
 
-  async login(dto: LoginDto): Promise<{ accessToken: string; user: object }> {
+  async login(
+    dto: LoginDto,
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const { email, password } = dto;
 
     // Repository returns UserForLogin | null; typed as LoginUser for lint resolution
@@ -229,16 +255,18 @@ export class AuthService {
       throw new UnauthorizedException('Your account has been deactivated.');
     }
 
-    const accessToken = this.signToken(user.id, user.role);
-
-    return { accessToken, user: this.sanitizeUser(user) };
+    const { accessToken, refreshToken } = await this.createTokenPair(
+      user.id,
+      user.role,
+    );
+    return { accessToken, refreshToken, user: this.sanitizeUser(user) };
   }
 
   // ─── GOOGLE LOGIN ─────────────────────────────────────────────────────────
 
   async googleLogin(
     dto: GoogleLoginDto,
-  ): Promise<{ accessToken: string; user: object }> {
+  ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const { email, googleId, name } = dto;
 
     // Check if user exists by googleId first, then by email
@@ -261,9 +289,44 @@ export class AuthService {
       throw new UnauthorizedException('Your account has been deactivated.');
     }
 
-    const accessToken = this.signToken(user.id, user.role);
+    const { accessToken, refreshToken } = await this.createTokenPair(
+      user.id,
+      user.role,
+    );
+    return { accessToken, refreshToken, user: this.sanitizeUser(user) };
+  }
 
-    return { accessToken, user: this.sanitizeUser(user) };
+  // ─── REFRESH TOKENS ───────────────────────────────────────────────────────
+
+  async refreshTokens(
+    refreshTokenRaw: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    type RefreshPayload = { sub?: string; jti?: string; type?: string };
+    let payload: RefreshPayload;
+    try {
+      payload = this.jwtService.verify<RefreshPayload>(refreshTokenRaw);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
+
+    if (payload.type !== 'refresh' || !payload.sub || !payload.jti) {
+      throw new UnauthorizedException('Invalid refresh token.');
+    }
+
+    const sub = payload.sub;
+    const jti = payload.jti;
+
+    const userId = await this.authRepository.findAndConsumeRefreshToken(jti);
+    if (!userId || userId !== sub) {
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
+    const user = await this.authRepository.findUserById(userId);
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Account is no longer active.');
+    }
+
+    return this.createTokenPair(user.id, user.role);
   }
 
   // ─── CREATE ADMIN (SUPER_ADMIN only) ─────────────────────────────────────

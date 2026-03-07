@@ -36,4 +36,7 @@ export const AuthRateLimits = {
 
   /** Admin creation per IP per minute. Defense in depth. */
   CREATE_ADMIN: { max: 5, timeWindow: ONE_MINUTE },
+
+  /** Refresh token exchange per IP per minute. */
+  REFRESH: { max: 10, timeWindow: ONE_MINUTE },
 } as const;

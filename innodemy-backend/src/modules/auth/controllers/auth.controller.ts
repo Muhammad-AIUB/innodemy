@@ -32,6 +32,7 @@ import { LoginDto } from '../dto/login.dto';
 import { GoogleLoginDto } from '../dto/google-login.dto';
 import { CreateAdminDto } from '../dto/create-admin.dto';
 import { CheckEmailDto } from '../dto/check-email.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -116,6 +117,22 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Google login successful.' })
   async googleLogin(@Body() dto: GoogleLoginDto) {
     const data = await this.authService.googleLogin(dto);
+    return { success: true, data };
+  }
+
+  @Post('refresh')
+  @RateLimit(AuthRateLimits.REFRESH)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Exchange refresh token for new access and refresh tokens',
+  })
+  @ApiResponse({ status: 200, description: 'Tokens refreshed successfully.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired refresh token.',
+  })
+  async refresh(@Body() dto: RefreshTokenDto) {
+    const data = await this.authService.refreshTokens(dto.refreshToken);
     return { success: true, data };
   }
 
