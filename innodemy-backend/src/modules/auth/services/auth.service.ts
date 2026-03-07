@@ -59,6 +59,10 @@ export class AuthService {
     return expiry;
   }
 
+  /**
+   * Signs a minimal JWT payload: sub (userId) + role only.
+   * Do not add personal/profile data — keeps token size small and reduces exposure.
+   */
   private signToken(userId: string, role: UserRole): string {
     const payload = { sub: userId, role };
     return this.jwtService.sign(payload);
