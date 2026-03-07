@@ -77,15 +77,25 @@ async function bootstrap() {
   });
 
   // ─── RATE LIMITING ────────────────────────────────────────────────────────
-  // Global: 100 req/min. Route-specific overrides via routeConfig.
+  // Global: 100 req/min per IP. Auth endpoints use stricter per-route limits
+  // (see AuthRateLimits). In-memory store; no Redis. trustProxy required for
+  // correct IP behind reverse proxy.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Fastify plugin type augmentation
   await app.register(rateLimit as any, {
     max: 100,
     timeWindow: '1 minute',
     keyGenerator: (req: {
-      headers: Record<string, string | undefined>;
+      headers: Record<string, string | string[] | undefined>;
       ip: string;
-    }) => (req.headers['x-forwarded-for'] as string) || req.ip,
+    }) => {
+      const forwarded = req.headers['x-forwarded-for'];
+      if (forwarded) {
+        const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+        const clientIp = typeof raw === 'string' ? raw.split(',')[0]?.trim() : undefined;
+        return clientIp ?? req.ip;
+      }
+      return req.ip;
+    },
     addHeadersOnExceeding: {
       'x-ratelimit-limit': true,
       'x-ratelimit-remaining': true,

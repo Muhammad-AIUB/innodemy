@@ -23,6 +23,7 @@ import { JwtGuard } from '../guards/jwt.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 import { RateLimit } from '../../../common/decorators/rate-limit.decorator';
+import { AuthRateLimits } from '../../../common/constants/auth-rate-limits';
 import { OtpBruteforceGuard } from '../../../common/guards/otp-bruteforce.guard';
 import { SendOtpDto } from '../dto/send-otp.dto';
 import { VerifyOtpDto } from '../dto/verify-otp.dto';
@@ -40,7 +41,7 @@ export class AuthController {
   // ─── OTP FLOW ─────────────────────────────────────────────────────────────
 
   @Post('check-email')
-  @RateLimit({ max: 10, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.CHECK_EMAIL)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Check if email already exists in the system',
@@ -59,7 +60,7 @@ export class AuthController {
   }
 
   @Post('send-otp')
-  @RateLimit({ max: 3, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.SEND_OTP)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Send a 6-digit OTP to the provided email' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully.' })
@@ -69,7 +70,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  @RateLimit({ max: 3, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.VERIFY_OTP)
   @UseGuards(OtpBruteforceGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify the OTP sent to the email' })
@@ -83,7 +84,7 @@ export class AuthController {
   // ─── REGISTRATION ─────────────────────────────────────────────────────────
 
   @Post('register')
-  @RateLimit({ max: 5, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.REGISTER)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new student account' })
   @ApiResponse({ status: 201, description: 'User registered successfully.' })
@@ -96,7 +97,7 @@ export class AuthController {
   // ─── LOGIN ────────────────────────────────────────────────────────────────
 
   @Post('login')
-  @RateLimit({ max: 5, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.LOGIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 200, description: 'Login successful.' })
@@ -109,7 +110,7 @@ export class AuthController {
   // ─── GOOGLE LOGIN ─────────────────────────────────────────────────────────
 
   @Post('google')
-  @RateLimit({ max: 5, timeWindow: '1 minute' })
+  @RateLimit(AuthRateLimits.GOOGLE_LOGIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login or register using Google OAuth credentials' })
   @ApiResponse({ status: 200, description: 'Google login successful.' })
@@ -138,6 +139,7 @@ export class AuthController {
   // ─── ADMIN CREATION (SUPER_ADMIN only) ───────────────────────────────────
 
   @Post('create-admin')
+  @RateLimit(AuthRateLimits.CREATE_ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN)
