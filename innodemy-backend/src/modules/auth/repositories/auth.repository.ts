@@ -156,14 +156,11 @@ export class AuthRepository {
     });
   }
 
-  async findLatestValidOtp(
-    email: string,
-    code: string,
-  ): Promise<OtpCode | null> {
+  /** Returns the latest valid (unused, unexpired) OTP for the email. Code comparison is done in the service using bcrypt. */
+  async findLatestValidOtpByEmail(email: string): Promise<OtpCode | null> {
     return this.prisma.otpCode.findFirst({
       where: {
         email,
-        code,
         isUsed: false,
         expiresAt: { gt: new Date() },
       },

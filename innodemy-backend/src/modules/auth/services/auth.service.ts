@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuthProvider, User, UserRole } from '@prisma/client';
+import { AuthProvider, OtpCode, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { AuthRepository } from '../repositories/auth.repository';
 import { OtpBruteforceGuard } from '../../../common/guards/otp-bruteforce.guard';
@@ -125,8 +125,9 @@ export class AuthService {
 
     const code = this.generateOtpCode();
     const expiresAt = this.getOtpExpiry();
+    const hashedCode = await bcrypt.hash(code, 10);
 
-    await this.authRepository.createOtp(email, code, expiresAt);
+    await this.authRepository.createOtp(email, hashedCode, expiresAt);
 
     // Fire-and-forget: send email in background so API returns immediately.
     // MailService logs errors; .catch() prevents unhandled rejection if it rethrows.
@@ -146,8 +147,17 @@ export class AuthService {
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
     const { email, code } = dto;
 
-    const otp = await this.authRepository.findLatestValidOtp(email, code);
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call -- AuthRepository returns Promise<OtpCode | null>; ESLint cannot resolve injected provider types */
+    const otp: OtpCode | null =
+      await this.authRepository.findLatestValidOtpByEmail(email);
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
     if (!otp) {
+      this.otpBruteforce.recordFailedAttempt(email);
+      throw new BadRequestException('Invalid or expired OTP.');
+    }
+
+    const isMatch = await bcrypt.compare(code, otp.code);
+    if (!isMatch) {
       this.otpBruteforce.recordFailedAttempt(email);
       throw new BadRequestException('Invalid or expired OTP.');
     }
@@ -193,7 +203,6 @@ export class AuthService {
     const { email, password } = dto;
 
     // Repository returns UserForLogin | null; typed as LoginUser for lint resolution
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- findUserByEmailForLogin is correctly typed in AuthRepository
     const user = (await this.authRepository.findUserByEmailForLogin(
       email,
     )) as LoginUser | null;
