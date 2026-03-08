@@ -10,6 +10,7 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 import { PublishBlogDto } from './dto/publish-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import {
+  AdminBlogListEntity,
   BlogEntity,
   BlogsRepository,
   PublishedBlogListEntity,
@@ -71,6 +72,23 @@ type AdminBlogResponse = PublicBlogDetail & {
   updatedAt: Date;
 };
 
+type AdminBlogListItem = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  bannerImage: string | null;
+  readDuration: number | null;
+  status: BlogStatus;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+  author: { id: string; name: string };
+  category: { id: string; name: string; slug: string } | null;
+  tags: Array<{ id: string; name: string }>;
+};
+
 type PaginatedBlogsResponse = {
   data: PublicBlogListItem[];
   meta: {
@@ -82,7 +100,7 @@ type PaginatedBlogsResponse = {
 };
 
 type PaginatedAdminBlogsResponse = {
-  data: AdminBlogResponse[];
+  data: AdminBlogListItem[];
   meta: {
     page: number;
     limit: number;
@@ -288,7 +306,7 @@ export class BlogsService {
     ]);
 
     return {
-      data: items.map((item) => this.mapAdminResponse(item)),
+      data: items.map((item) => this.mapAdminListItem(item)),
       meta: {
         page,
         limit,
@@ -425,6 +443,34 @@ export class BlogsService {
       bannerImage: item.bannerImage,
       readDuration: item.readDuration,
       publishedAt: item.publishedAt,
+    };
+  }
+
+  private mapAdminListItem(item: AdminBlogListEntity): AdminBlogListItem {
+    return {
+      id: item.id,
+      title: item.title,
+      slug: item.slug,
+      excerpt: item.excerpt,
+      bannerImage: item.bannerImage,
+      readDuration: item.readDuration,
+      status: item.status,
+      publishedAt: item.publishedAt,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      isDeleted: item.isDeleted,
+      author: { id: item.author.id, name: item.author.name },
+      category: item.category
+        ? {
+            id: item.category.id,
+            name: item.category.name,
+            slug: item.category.slug,
+          }
+        : null,
+      tags: item.tags.map((t) => ({
+        id: t.tag.id,
+        name: t.tag.name,
+      })),
     };
   }
 

@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { BlogStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/prisma/prisma.service';
+
+const BLOG_STATUS_PUBLISHED = 'PUBLISHED' as const;
+const BLOG_STATUS_ARCHIVED = 'ARCHIVED' as const;
 
 const blogDetailInclude = {
   author: true,
@@ -22,12 +25,41 @@ const publishedListSelect = {
   publishedAt: true,
 } satisfies Prisma.BlogSelect;
 
+const adminListSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  bannerImage: true,
+  readDuration: true,
+  status: true,
+  publishedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  isDeleted: true,
+  author: {
+    select: { id: true, name: true },
+  },
+  category: {
+    select: { id: true, name: true, slug: true },
+  },
+  tags: {
+    select: {
+      tag: { select: { id: true, name: true } },
+    },
+  },
+} satisfies Prisma.BlogSelect;
+
 export type BlogEntity = Prisma.BlogGetPayload<{
   include: typeof blogDetailInclude;
 }>;
 
 export type PublishedBlogListEntity = Prisma.BlogGetPayload<{
   select: typeof publishedListSelect;
+}>;
+
+export type AdminBlogListEntity = Prisma.BlogGetPayload<{
+  select: typeof adminListSelect;
 }>;
 
 @Injectable()
@@ -59,15 +91,19 @@ export class BlogsRepository {
     });
   }
 
-  findPublishedBySlug(slug: string): Promise<BlogEntity | null> {
-    return this.prisma.blog.findFirst({
-      where: {
-        slug,
-        status: BlogStatus.PUBLISHED,
-        isDeleted: false,
-      },
+  async findPublishedBySlug(slug: string): Promise<BlogEntity | null> {
+    const blog = await this.prisma.blog.findUnique({
+      where: { slug },
       include: blogDetailInclude,
     });
+    if (
+      !blog ||
+      blog.status !== BLOG_STATUS_PUBLISHED ||
+      blog.isDeleted
+    ) {
+      return null;
+    }
+    return blog;
   }
 
   findPublishedPaginated(params: {
@@ -79,7 +115,7 @@ export class BlogsRepository {
 
     return this.prisma.blog.findMany({
       where: {
-        status: BlogStatus.PUBLISHED,
+        status: BLOG_STATUS_PUBLISHED,
         isDeleted: false,
         ...(categoryId ? { categoryId } : {}),
       },
@@ -94,7 +130,7 @@ export class BlogsRepository {
     skip: number;
     take: number;
     categoryId?: string;
-  }): Promise<BlogEntity[]> {
+  }): Promise<AdminBlogListEntity[]> {
     const { skip, take, categoryId } = params;
 
     return this.prisma.blog.findMany({
@@ -105,14 +141,14 @@ export class BlogsRepository {
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: blogDetailInclude,
+      select: adminListSelect,
     });
   }
 
   countPublished(categoryId?: string): Promise<number> {
     return this.prisma.blog.count({
       where: {
-        status: BlogStatus.PUBLISHED,
+        status: BLOG_STATUS_PUBLISHED,
         isDeleted: false,
         ...(categoryId ? { categoryId } : {}),
       },
@@ -147,7 +183,7 @@ export class BlogsRepository {
       where: { id },
       data: {
         isDeleted: true,
-        status: BlogStatus.ARCHIVED,
+        status: BLOG_STATUS_ARCHIVED,
       },
       select: {
         id: true,
