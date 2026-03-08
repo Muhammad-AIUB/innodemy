@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { AuthProvider, OtpCode, User, UserRole } from '@prisma/client';
+import { AuthProvider, User, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { AuthRepository } from '../repositories/auth.repository';
 import { OtpBruteforceGuard } from '../../../common/guards/otp-bruteforce.guard';
@@ -174,7 +174,7 @@ export class AuthService {
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
     const { email, code } = dto;
 
-    const otp: OtpCode | null =
+    const otp =
       await this.authRepository.findLatestValidOtpByEmail(email);
 
     if (!otp) {
@@ -246,13 +246,13 @@ export class AuthService {
       );
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Your account has been deactivated.');
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid email or password.');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Your account has been deactivated.');
     }
 
     const { accessToken, refreshToken } = await this.createTokenPair(
@@ -269,10 +269,10 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string; user: object }> {
     const { email, googleId, name } = dto;
 
-    // Check if user exists by googleId first, then by email
+    // Check if user exists by googleId first, then by email (minimal fields for login)
     let user =
-      (await this.authRepository.findUserByGoogleId(googleId)) ??
-      (await this.authRepository.findUserByEmail(email));
+      (await this.authRepository.findUserByGoogleIdForLogin(googleId)) ??
+      (await this.authRepository.findUserByEmailForSocialLogin(email));
 
     if (!user) {
       user = await this.authRepository.createUser({

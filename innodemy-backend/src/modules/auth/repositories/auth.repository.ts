@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OtpCode, Prisma, User, UserRole } from '@prisma/client';
 import { PrismaService } from '../../../shared/prisma/prisma.service';
 
-/** User fields needed for login: auth checks, JWT, and response payload. */
+/** Minimal fields for email/password login: validation, JWT, and response. */
 export type UserForLogin = Pick<
   User,
   | 'id'
@@ -18,14 +18,33 @@ export type UserForLogin = Pick<
   | 'createdAt'
 >;
 
+/** Minimal fields for social login (no password): JWT and response. */
+export type UserForSocialLogin = Pick<
+  User,
+  | 'id'
+  | 'name'
+  | 'email'
+  | 'phoneNumber'
+  | 'role'
+  | 'provider'
+  | 'isVerified'
+  | 'isActive'
+  | 'isDeleted'
+  | 'createdAt'
+>;
+
 @Injectable()
 export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // ─── USER QUERIES ─────────────────────────────────────────────────────────
 
-  async findUserByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { email } });
+  /** Existence check only — selects minimal field to reduce payload. */
+  async findUserByEmail(email: string): Promise<Pick<User, 'id'> | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
   }
 
   /** Fetches only fields required for login: auth checks + JWT + response payload. */
@@ -52,8 +71,65 @@ export class AuthRepository {
     return this.prisma.user.findUnique({ where: { googleId } });
   }
 
-  async findUserById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { id } });
+  /** Fetches only fields required for Google/social login (no password, no relations). */
+  async findUserByGoogleIdForLogin(
+    googleId: string,
+  ): Promise<UserForSocialLogin | null> {
+    return this.prisma.user.findUnique({
+      where: { googleId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        role: true,
+        provider: true,
+        isVerified: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /** Fetches only fields required for social login lookup by email (no password). */
+  async findUserByEmailForSocialLogin(
+    email: string,
+  ): Promise<UserForSocialLogin | null> {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        role: true,
+        provider: true,
+        isVerified: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  /** Fetches only fields needed for getMe, refresh, and admin actions (no relations). */
+  async findUserById(id: string): Promise<UserForSocialLogin | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        role: true,
+        provider: true,
+        isVerified: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+      },
+    });
   }
 
   async createUser(data: Prisma.UserCreateInput): Promise<User> {
@@ -69,7 +145,7 @@ export class AuthRepository {
     order?: string;
     isActive?: string;
     isDeleted?: string;
-  }): Promise<{ users: User[]; total: number }> {
+  }): Promise<{ users: UserForSocialLogin[]; total: number }> {
     const page = options?.page && options.page > 0 ? options.page : 1;
     const limit =
       options?.limit && options.limit > 0 ? Math.min(options.limit, 100) : 20;
@@ -126,6 +202,18 @@ export class AuthRepository {
         orderBy: { [finalSortBy]: order },
         skip: (page - 1) * limit,
         take: limit,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phoneNumber: true,
+          role: true,
+          provider: true,
+          isVerified: true,
+          isActive: true,
+          isDeleted: true,
+          createdAt: true,
+        },
       }),
       this.prisma.user.count({ where: finalWhere }),
     ]);
@@ -133,12 +221,30 @@ export class AuthRepository {
     return { users, total };
   }
 
-  async updateUserRole(id: string, role: UserRole): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data: { role } });
+  async updateUserRole(
+    id: string,
+    role: UserRole,
+  ): Promise<UserForSocialLogin> {
+    return this.prisma.user.update({
+      where: { id },
+      data: { role },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        role: true,
+        provider: true,
+        isVerified: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+      },
+    });
   }
 
-  async deactivateUser(id: string): Promise<User> {
-    return this.prisma.user.update({
+  async deactivateUser(id: string): Promise<void> {
+    await this.prisma.user.update({
       where: { id },
       data: { isActive: false, isDeleted: true },
     });
@@ -156,8 +262,10 @@ export class AuthRepository {
     });
   }
 
-  /** Returns the latest valid (unused, unexpired) OTP for the email. Code comparison is done in the service using bcrypt. */
-  async findLatestValidOtpByEmail(email: string): Promise<OtpCode | null> {
+  /** Returns the latest valid (unused, unexpired) OTP. Only id and code needed for verification. */
+  async findLatestValidOtpByEmail(
+    email: string,
+  ): Promise<Pick<OtpCode, 'id' | 'code'> | null> {
     return this.prisma.otpCode.findFirst({
       where: {
         email,
@@ -165,6 +273,7 @@ export class AuthRepository {
         expiresAt: { gt: new Date() },
       },
       orderBy: { createdAt: 'desc' },
+      select: { id: true, code: true },
     });
   }
 
@@ -202,6 +311,7 @@ export class AuthRepository {
     const now = new Date();
     const token = await this.prisma.refreshToken.findUnique({
       where: { jti },
+      select: { userId: true, expiresAt: true },
     });
     if (!token || token.expiresAt <= now) {
       return null;

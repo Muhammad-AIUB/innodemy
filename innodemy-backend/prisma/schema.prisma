@@ -115,7 +115,6 @@ model User {
   @@index([isDeleted])
   @@index([isActive])
   @@index([createdAt])
-  @@index([provider])
 }
 
 model OtpCode {
@@ -131,7 +130,6 @@ model OtpCode {
   createdAt DateTime @default(now())
 
   @@index([email])
-  @@index([userId])
   @@index([expiresAt])
 }
 
